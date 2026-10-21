@@ -1,0 +1,29 @@
+# Gradle / Android build output
+launcher/.gradle/
+launcher/build/
+launcher/app/build/
+launcher/local.properties
+launcher/.idea/
+launcher/captures/
+*.iml
+*.apk
+*.aab
+*.hprof
+.kotlin/
+
+# Signing material — never commit
+*.jks
+*.keystore
+keystore.properties
+
+# Local working area, not part of the project
+build/
+reference/
+shots/
+scrcpy-live.log
+.upstream-sha
+
+# OS noise
+Thumbs.db
+.DS_Store
+desktop.ini
