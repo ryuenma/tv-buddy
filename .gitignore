@@ -27,3 +27,6 @@ scrcpy-live.log
 Thumbs.db
 .DS_Store
 desktop.ini
+
+# Raw device dumps (local working data)
+.debloat/
