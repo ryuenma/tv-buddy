@@ -255,13 +255,13 @@
                     style="@style/TopButton"
                     android:text="@string/settings"
                     android:drawableStart="@drawable/ic_settings"
-                    android:nextFocusDown="@+id/grid" />
-
-                <TextView
-                    android:id="@+id/btnRestart"
-                    style="@style/TopButtonIcon"
-                    android:contentDescription="@string/restart"
-                    android:drawableStart="@drawable/ic_restart"
+                    android:nextFocusDown="@+id/grid" />
+
+                <TextView
+                    android:id="@+id/btnRestart"
+                    style="@style/TopButtonIcon"
+                    android:contentDescription="@string/restart"
+                    android:drawableStart="@drawable/ic_restart"
                     android:nextFocusDown="@+id/grid" />
 
                 <TextView

@@ -1,0 +1,14 @@
+# One form for text, so a diff shows the edit and not the whole file. Edits here have flipped entire
+# files between LF and CRLF, which made every line look changed and hid the real ones.
+* text=auto eol=lf
+
+# Windows launchers want CRLF.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Artwork and other binaries: never touched.
+*.jpg binary
+*.jpeg binary
+*.png binary
+*.webp binary
+*.apk binary
