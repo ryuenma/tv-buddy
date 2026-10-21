@@ -191,3 +191,45 @@ restart is still the remote: long-press power for the power menu.
 One bug this surfaced: after a dialog dismisses, the activity's saved focus beats
 `requestFocus()`, so focus landed on a tile and the next Enter launched an app.
 Focus is now restored from `setOnDismissListener` on a short post.
+
+## Following the ambient artwork (2026-10-21)
+
+Google TV's screensaver downloads its artwork and rotates it on Google's own
+schedule. The pictures live in a `DiskLruCache` at
+
+```
+/sdcard/Android/data/com.google.android.apps.tv.dreamx/files/Pictures/cache/
+```
+
+content-addressed by SHA-256 with a `.0` suffix, plus a `journal`. At the time of
+measurement it held **17 entries (4 MB)**, of which **16 were unique 1920×1080
+WEBP pictures not present in the APK's own 10 bundled assets** — so it really does
+refresh, and reading it is the only way to follow along.
+
+**An app cannot read that directory.** Measured from the launcher's own uid:
+
+```
+uid=10061  exists=true  isDir=true  canRead=false  canExecute=true  listFiles=NULL
+```
+
+That is *with* `MANAGE_EXTERNAL_STORAGE` granted (`appops set ... allow`). Android 11
+keeps `Android/data/<pkg>` sealed per app; All-files-access lifts the scoped-storage
+restriction on shared storage, not this one. The directory mode is `771` (other gets
+execute but not read) and the files are `660` in group `sdcard_rw` — which is
+exactly why **adb shell can read it and an app cannot**: `shell` is in `sdcard_rw`.
+
+So the bridge is the host, not the app. `tools/sync-ambient.sh` runs a small script
+on the TV (`shell sh -s`), copies new pictures into the collection and deletes
+copies of pictures the cache has evicted. Measured: first run `16 added, 0 retired`;
+repeat runs `0 added, 0 retired, 16 unchanged` (idempotent); deleting a copy
+restores it; an invented `ambient-deadbeef.webp` is retired. The launcher rescans
+its own collection on each rotation, so it needs no restart.
+
+`AmbientMirror.java` was written and then deleted: it worked as designed but the
+platform refuses the read, so keeping it would have been dead code behind a
+permission that does not help.
+
+One environment note that cost time here: **logcat is empty on this set** (`logcat
+-d` returns 0 lines), so `Log.w` is useless for diagnosis. The uid/permission
+question above was answered by having the app write a status file into its own
+directory and reading that back.

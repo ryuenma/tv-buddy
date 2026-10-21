@@ -162,6 +162,27 @@ ADB="F:/Android Emulator/sdk/platform-tools/adb.exe" sh tools/push-theme.sh 192.
 
 `theme/config.json` sets a 10-minute rotation with a 55% dim.
 
+### Following the ambient screensaver
+
+Google refreshes the ambient artwork on its own schedule: `dreamx` downloads the
+pictures, keeps them in a `DiskLruCache` under its own external data directory, and
+rotates that set. The launcher **cannot** read that directory — measured from the
+launcher's own uid, `canRead=false` and a null listing *even with
+`MANAGE_EXTERNAL_STORAGE` granted*, because Android 11 keeps `Android/data/<pkg>`
+sealed per app. adb can read it, because `shell` runs in the `sdcard_rw` group. So
+the copy happens from the host:
+
+```bash
+sh tools/sync-ambient.sh 192.168.31.35          # picked up on the next rotation
+sh tools/sync-ambient.sh 192.168.31.35 --now    # ...or restart Home straight away
+```
+
+Only new pictures are copied, and copies of pictures Google has retired are
+removed, so the rotation tracks the screensaver instead of growing forever. The
+copy runs on the TV (`sh -s`), so no picture crosses the network. Schedule it if
+you want it to keep up on its own — the launcher rescans its own collection on every
+rotation, so nothing needs restarting when it lands.
+
 Two things adapt the artwork to the interface. The picture is **blurred once at
 decode** (shrink to a quarter, box-blur, scale back up) rather than per frame,
 which Android 11 makes necessary — it has no `RenderEffect` (API 31) and no AGSL

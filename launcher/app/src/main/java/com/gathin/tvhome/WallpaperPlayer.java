@@ -21,6 +21,7 @@ import java.util.concurrent.Executors;
 /** Displays and rotates a theme's local wallpaper images while Home is visible. */
 final class WallpaperPlayer {
     private final FrameLayout root;
+    private final Context context;
     private final ImageView image;
     private final List<File> files;
     private final long interval;
@@ -39,6 +40,7 @@ final class WallpaperPlayer {
 
     WallpaperPlayer(Context context, FrameLayout root, Config config) {
         this.root = root;
+        this.context = context;
         files = new ArrayList<>(config.wallpapers);
         interval = config.wallpaperRotationMinutes * 60_000L;
         bitmapConfig = config.wallpaperTrueColor ? Bitmap.Config.ARGB_8888 : Bitmap.Config.RGB_565;
@@ -70,6 +72,22 @@ final class WallpaperPlayer {
             }
             showFirst();
         }
+    }
+
+    /**
+     * Re-reads the collection on each rotation, so pictures added from outside the app appear without
+     * restarting Home. That is the only path available: dreamx keeps its artwork in its own external data
+     * directory, which another uid cannot read — measured `canRead=false` and a null listing even with
+     * MANAGE_EXTERNAL_STORAGE granted. tools/sync-ambient.sh does that copying from the host over adb,
+     * and this picks the result up.
+     */
+    private void rescanCollection() {
+        File dir = context.getExternalFilesDir(null);
+        if (dir == null) return;
+        List<File> fresh = WallpaperRotation.images(new File(dir, ThemeFiles.WALLPAPERS));
+        if (fresh.isEmpty() || fresh.equals(files)) return;
+        files.clear();
+        files.addAll(fresh);
     }
 
     /**
@@ -118,6 +136,8 @@ final class WallpaperPlayer {
         File selected = WallpaperRotation.find(files, previous);
         long changed = preferences.getLong("changed", 0);
         if (selected == null || WallpaperRotation.due(changed, System.currentTimeMillis(), interval)) {
+            // The collection can gain or lose pictures from outside (tools/sync-ambient.sh); re-read it.
+            rescanCollection();
             selected = WallpaperRotation.pick(files, previous, order, random);
         }
         if (selected == null || selected.getName().equals(displayed)) return;
