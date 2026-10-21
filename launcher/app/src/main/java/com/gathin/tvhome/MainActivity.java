@@ -201,6 +201,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private List<String> orderAtStart;
     private View btnReorder;
     private View btnRestart;
+    /** Set when a dialog closes without restarting, so focus returns to the button that opened it. */
+    private boolean returnFocusToRestart;
     /** dock_apps as loaded (config.xml or a theme): a saved Order only applies while these are unchanged. */
     private List<String> dockApps;
     /** fill_dock false: the dock can have empty slots, which reorder mode leaves out and restores afterwards. */
@@ -779,6 +781,10 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     public void onWindowFocusChanged(boolean hasFocus) {
         super.onWindowFocusChanged(hasFocus);
         if (hasFocus) {
+            if (returnFocusToRestart) {
+                returnFocusToRestart = false;
+                if (btnRestart != null) btnRestart.requestFocus();
+            }
             if (libraryFocusPending && appLibrary == null) focusLibrary();
             showCardPrompt();
         }
@@ -2296,16 +2302,21 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
 
         TextView no = panel.findViewById(R.id.btnNo);
         TextView yes = panel.findViewById(R.id.btnYes);
+        final boolean[] restarting = {false};
         View.OnClickListener choose = v -> {
-            boolean restart = v.getId() == R.id.btnYes;
+            restarting[0] = v.getId() == R.id.btnYes;
             dialog.dismiss();
-            if (restart) restartHome();
+            if (restarting[0]) restartHome();
         };
         no.setOnClickListener(choose);
         yes.setOnClickListener(choose);
-        // Focus has to come back to the button that opened this. The activity's own saved focus wins
-        // otherwise and lands on a tile, where the next Enter would launch an app instead.
-        dialog.setOnDismissListener(d -> btnRestart.postDelayed(btnRestart::requestFocus, 60));
+        // Focus has to come back to the button that opened this. The activity's saved focus wins
+        // otherwise, landing on a tile, and the next Enter would launch that app instead — measured: it
+        // opened YouTube. A postDelayed(requestFocus) loses that race; only onWindowFocusChanged fires
+        // after the framework has finished restoring, so the flag is claimed there.
+        dialog.setOnDismissListener(d -> {
+            if (!restarting[0]) returnFocusToRestart = true;
+        });
         // Left and Right move between the two answers; Up and Down stay put.
         View.OnKeyListener keys = (v, keyCode, event) -> {
             if (event.getAction() != KeyEvent.ACTION_DOWN) return false;
