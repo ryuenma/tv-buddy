@@ -1903,8 +1903,6 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         String text = getString(R.string.wifi);
         boolean vpn = false, online = false;
         int icon = R.drawable.ic_wifi;
-        int flame = 0;
-        boolean steady = false;
         try {
             ConnectivityManager cm = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
             boolean wifi = false, ethernet = false;
@@ -1927,13 +1925,10 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             } else if (ethernet) {
                 text = getString(R.string.ethernet);
                 icon = R.drawable.ic_ethernet;
-                flame = 4;
-                steady = true;
             } else if (wifi) {
                 WifiManager wm = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
                 WifiInfo info = wm != null ? wm.getConnectionInfo() : null;
                 String ssid = info != null ? info.getSSID() : null;
-                flame = info != null ? Math.max(1, Math.min(4, WifiManager.calculateSignalLevel(info.getRssi(), 5))) : 3;
                 if (ssid != null) {
                     ssid = ssid.replace("\"", "").trim();
                     if (!ssid.isEmpty() && !ssid.contains("unknown") && !ssid.equals("0x")) text = ssid;

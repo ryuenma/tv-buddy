@@ -195,36 +195,10 @@ final class WallpaperPlayer {
             return src;
         }
         if (small != src) src.recycle();
-        int[] px = new int[w * h], mid = new int[px.length];
+        int[] px = new int[w * h];
         small.getPixels(px, 0, w, 0, 0, w, h);
-        blurAxis(px, mid, w, h, true);
-        blurAxis(px, mid, w, h, false);
+        Blur.apply(px, w, h);
         small.setPixels(px, 0, w, 0, 0, w, h);
         return small;
-    }
-
-    /**
-     * One box-blur pass along one axis. Both orientations write the same linear index they read, so a
-     * single copy back from the scratch buffer finishes either direction.
-     */
-    private static void blurAxis(int[] px, int[] mid, int w, int h, boolean horizontal) {
-        final int radius = 2;
-        int lines = horizontal ? h : w, limit = horizontal ? w : h;
-        for (int a = 0; a < lines; a++) {
-            for (int b = 0; b < limit; b++) {
-                int r = 0, g = 0, bl = 0, n = 0;
-                for (int k = -radius; k <= radius; k++) {
-                    int c = b + k;
-                    if (c < 0 || c >= limit) continue;
-                    int colour = px[horizontal ? a * w + c : c * w + a];
-                    r += (colour >> 16) & 0xFF;
-                    g += (colour >> 8) & 0xFF;
-                    bl += colour & 0xFF;
-                    n++;
-                }
-                mid[horizontal ? a * w + b : b * w + a] = 0xFF000000 | (r / n) << 16 | (g / n) << 8 | (bl / n);
-            }
-        }
-        System.arraycopy(mid, 0, px, 0, px.length);
     }
 }
