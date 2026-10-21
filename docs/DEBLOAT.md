@@ -139,6 +139,63 @@ Also note: during measurement the device was serving **scrcpy** (`app_process`
 74 MB + 48 MB). That is our instrumentation, not the TV's baseline, and must be
 disconnected before any before/after comparison is trusted.
 
+## APPLIED — Tier 1 (2026-10-21)
+
+18 packages disabled, `com.tcl.useragreement` deliberately **held back** (it runs
+`CheckUpdateService`, so it was left alone rather than assumed harmless — the
+firmware updater `com.tcl.versionUpdateApp` was never in Tier 1 and remains
+enabled).
+
+Applied set:
+
+```
+com.tcl.bi                        com.tcl.usercenter
+com.tcl.messagebox                com.tcl.overseasappshow
+com.tcl.tv.tclhome_passive        com.tcl.esticker
+com.tcl.logkit                    com.tcl.gamebar
+com.tcl.hearaid                   com.tcl.ocean.instructions
+com.tcl.android.webview           com.google.android.feedback
+com.google.android.tungsten.setupwraith
+com.android.printspooler          com.android.camera2
+org.chromium.webview_shell        com.android.htmlviewer
+com.android.wallpaperbackup
+```
+
+### Proof that nothing was uninstalled
+
+[O] After applying, all 18 report `installed=true` and `enabled=3`
+(`COMPONENT_ENABLED_STATE_DISABLED_USER`) — present on disk, disabled for the user.
+`pm list packages` still returns **139** packages, unchanged from before.
+Disabled count went 5 → 23 and **persisted across a reboot**.
+
+### Measured result — rebooted, scrcpy disconnected
+
+| Metric | Baseline | After Tier 1 | Delta |
+|---|---|---|---|
+| `MemFree` | 102,532 kB | **149,520 kB** | +46,988 kB |
+| `MemAvailable` | 315,100 kB | **593,436 kB** | **+278,336 kB (+272 MB)** |
+| Swap in use | 516,780 kB | **233,216 kB** | **−283,564 kB (−277 MB)** |
+| Installed packages | 139 | 139 | 0 (nothing removed) |
+
+**The swap number is the one that matters.** The TV was holding 504 MB of swapped
+pages at rest; it now holds 228 MB. Those pages were being paged back in on every
+app switch — that is the lag, and it is roughly halved.
+
+Debloated processes no longer appear at all: `com.tcl.bi`, `usercenter`,
+`messagebox`, `overseasappshow`, `tclhome_passive` are gone from `ps` after boot.
+
+### Functional smoke test after reboot
+
+[O] All launched successfully to their real activities:
+
+- YouTube → `com.google.android.youtube.tv/...MainActivity`
+- Netflix → `com.netflix.ninja/.MainActivity` (confirms `gms`/DRM intact)
+- Live TV → `com.tcl.tv/.TVActivity`
+- HOME → back to `launcherx`
+
+**Still to check by hand (needs the physical remote):** every remote button,
+HDMI 1–3 picture, audio, picture/sound settings, phone casting.
+
 ## Apply procedure
 
 ```bash
