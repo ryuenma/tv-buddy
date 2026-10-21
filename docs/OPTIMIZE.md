@@ -59,9 +59,9 @@ alone is worth more than all the trivia combined — and costs the voice button.
 
 | Change | Command | Why |
 |---|---|---|
-| **Enable cached-apps freezer** ✅ already set, needs reboot | `settings put global cached_apps_freezer enabled` | Android 11 feature, **off on this TV** (`use_freezer=false`). Freezes cached apps instead of letting them burn CPU and pages — exactly the workload that makes a 2 GB set stutter |
+| ~~Enable cached-apps freezer~~ ❌ **DOES NOT WORK ON THIS UNIT** | `settings put global cached_apps_freezer enabled` | **Tried and retracted.** The kernel does expose PSI (`/proc/pressure/{cpu,io,memory}` all exist) and the vendor sets `persist.sys.freeze=true`, so this *looked* supported. But after setting it and rebooting, AMS still reports **`use_freezer=false`** and `dumpsys activity processes` counts **0** processes with `frozen=true`. The setting is accepted and persisted, and the runtime ignores it — a vendor-gated AOSP path, presumably because Realtek ships its own `persist.sys.freeze` mechanism. The setting was reverted with `settings delete` so no dead knob is left behind. **Not achievable without vendor/root changes.** |
 | Restrict unused third-party apps to the **restricted** standby bucket | `am set-standby-bucket <pkg> restricted` | Verified working (40 → 10). Stops background wakeups for apps she never opens |
-| Animations `0.5` → `0` | `settings put global window_animation_scale 0` (×3) | Already halved; going to zero is marginal but free |
+| Animations `0.5` → `0` | `settings put global window_animation_scale 0` (×3) | **Owner declined** — 0.5 is wanted. No change made. |
 | Restrict the 8 unused streaming/media apps | see D | Removes clutter she scrolls past |
 
 Apps never opened in the 24 h usage sample, all safe standby-bucket candidates:
