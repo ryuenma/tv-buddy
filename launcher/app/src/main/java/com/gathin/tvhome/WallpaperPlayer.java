@@ -172,9 +172,59 @@ final class WallpaperPlayer {
                 options.inTargetDensity = scale[1];
             }
             options.inPreferredConfig = bitmapConfig;
-            return BitmapFactory.decodeFile(file.getPath(), options);
+            return soften(BitmapFactory.decodeFile(file.getPath(), options));
         } catch (Exception | OutOfMemoryError failure) {
             return null;
         }
+    }
+
+    /**
+     * Blurs the picture once, at decode time, so the glass panels sit on soft colour instead of a sharp
+     * image. Android 11 has no RenderEffect (API 31, and AGSL is 33), so a backdrop blur has to be
+     * pre-computed: shrink the bitmap, box-blur it a couple of passes, and let the ImageView scale it
+     * back up with filtering. The work happens once per wallpaper change, off the render path.
+     */
+    private Bitmap soften(Bitmap src) {
+        if (src == null) return null;
+        int w = Math.max(1, src.getWidth() / 8), h = Math.max(1, src.getHeight() / 8);
+        if (w < 4 || h < 4) return src;   // already tiny: nothing worth blurring
+        Bitmap small;
+        try {
+            small = Bitmap.createScaledBitmap(src, w, h, true);
+        } catch (OutOfMemoryError failure) {
+            return src;
+        }
+        if (small != src) src.recycle();
+        int[] px = new int[w * h], mid = new int[px.length];
+        small.getPixels(px, 0, w, 0, 0, w, h);
+        blurAxis(px, mid, w, h, true);
+        blurAxis(px, mid, w, h, false);
+        small.setPixels(px, 0, w, 0, 0, w, h);
+        return small;
+    }
+
+    /**
+     * One box-blur pass along one axis. Both orientations write the same linear index they read, so a
+     * single copy back from the scratch buffer finishes either direction.
+     */
+    private static void blurAxis(int[] px, int[] mid, int w, int h, boolean horizontal) {
+        final int radius = 2;
+        int lines = horizontal ? h : w, limit = horizontal ? w : h;
+        for (int a = 0; a < lines; a++) {
+            for (int b = 0; b < limit; b++) {
+                int r = 0, g = 0, bl = 0, n = 0;
+                for (int k = -radius; k <= radius; k++) {
+                    int c = b + k;
+                    if (c < 0 || c >= limit) continue;
+                    int colour = px[horizontal ? a * w + c : c * w + a];
+                    r += (colour >> 16) & 0xFF;
+                    g += (colour >> 8) & 0xFF;
+                    bl += colour & 0xFF;
+                    n++;
+                }
+                mid[horizontal ? a * w + b : b * w + a] = 0xFF000000 | (r / n) << 16 | (g / n) << 8 | (bl / n);
+            }
+        }
+        System.arraycopy(mid, 0, px, 0, px.length);
     }
 }
