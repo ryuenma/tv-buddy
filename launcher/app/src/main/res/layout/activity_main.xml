@@ -12,6 +12,24 @@
         android:layout_height="match_parent"
         android:importantForAccessibility="no" />
 
+    <!-- Soft vignette on the header's corner so the greeting and date stay legible over a bright
+
+         photograph. Static drawable, no per-frame cost. -->
+
+    <View
+
+        android:id="@+id/readingScrim"
+
+        android:layout_width="match_parent"
+
+        android:layout_height="match_parent"
+
+        android:background="@drawable/scrim_reading"
+
+        android:importantForAccessibility="no" />
+
+
+
     <!-- Cinematic top shelf (cinematic_home): the focused dock app's artwork, a few pixels across and
          stretched over the screen, which softens it like a blur without the cost of one. Hidden otherwise. -->
     <ImageView
@@ -263,6 +281,13 @@
                     style="@style/TopButton"
                     android:text="@string/settings"
                     android:drawableStart="@drawable/ic_settings"
+                    android:nextFocusDown="@+id/grid" />
+
+                <TextView
+                    android:id="@+id/btnRestart"
+                    style="@style/TopButtonIcon"
+                    android:contentDescription="@string/restart"
+                    android:drawableStart="@drawable/ic_restart"
                     android:nextFocusDown="@+id/grid" />
             </LinearLayout>
         </RelativeLayout>

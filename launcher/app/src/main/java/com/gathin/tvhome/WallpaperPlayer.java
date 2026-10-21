@@ -183,10 +183,16 @@ final class WallpaperPlayer {
      * image. Android 11 has no RenderEffect (API 31, and AGSL is 33), so a backdrop blur has to be
      * pre-computed: shrink the bitmap, box-blur it a couple of passes, and let the ImageView scale it
      * back up with filtering. The work happens once per wallpaper change, off the render path.
+     *
+     * SHRINK is 4 rather than 8 because the wallpapers are photographs, not colour fields: at 8 the
+     * subject dissolves entirely and the peak colours wash out, which costs far more than it buys.
+     * Readability over a busy photo is the dim layer's job, not the blur's.
      */
+    private static final int SHRINK = 4;
+
     private Bitmap soften(Bitmap src) {
         if (src == null) return null;
-        int w = Math.max(1, src.getWidth() / 8), h = Math.max(1, src.getHeight() / 8);
+        int w = Math.max(1, src.getWidth() / SHRINK), h = Math.max(1, src.getHeight() / SHRINK);
         if (w < 4 || h < 4) return src;   // already tiny: nothing worth blurring
         Bitmap small;
         try {

@@ -30,3 +30,4 @@ desktop.ini
 
 # Raw device dumps (local working data)
 .debloat/
+theme/wallpapers/*.webp

@@ -138,3 +138,56 @@ The least-audited area is **`AppLibraryDialog` and the three settings
 activities** — they handle focus, dismissal and preference writes, which is
 exactly where a stuck-focus or lost-setting bug would live. If this repo grows,
 audit those first.
+
+## Re-audit: text over photographic wallpapers (2026-10-21)
+
+The wallpapers changed from generated colour fields to Google TV's ambient
+photographs, so every surface that composites straight onto the wallpaper was
+re-checked against the **worst case**: `background1`, whose pale sky is the
+brightest thing in the collection, forced as the only wallpaper.
+
+1. **Header text washed out.** Over the pale sky the greeting and date were
+   unreadable and the clock was marginal — blur does nothing for contrast here,
+   because a photograph blurs to a *bright* field at the sky, not a dark one.
+   Fixed with `scrim_reading`, a soft radial vignette anchored on the header's
+   corner (`drawable-ldrtl/` carries the mirrored twin for the RTL layout).
+   Re-checked over the same worst case: all three lines readable, no hard edge,
+   photo still visible.
+2. **`Connected` in the focused input row was too pale.** `pill_text_dim` used
+   `#99111111` — 60% black — for the focused state, which is fine on a dark panel
+   and nearly invisible on the white focused pill, at 11sp. Not a wallpaper
+   problem; found because the check widened to every overlay. Now `#CC111111`
+   focused, and the unfocused `#73FFFFFF` raised to `#99FFFFFF` for the same
+   reason on dark panels.
+3. **Surfaces with their own background are unaffected** — dock tiles, app cards,
+   popup panels and dialogs sit on opaque or near-opaque surfaces, so the
+   wallpaper cannot reach their text.
+4. **Blur strength was wrong for photographs.** The decode-time blur shrank to
+   1/8, which reduces a photograph to a colour field. Reduced to 1/4: the subject
+   still reads, and contrast is handled by the dim layer and the vignette.
+
+## The restart button: what works, and the part that cannot
+
+A restart icon sits beside Settings, with a Yes/No confirmation (No focused by
+default). The dialog, the D-pad handling and the focus return all work. **The
+system restart itself is not possible from an app installed from an APK on this
+set**, and that is a platform rule, not a defect in this code:
+
+- `android.permission.REBOOT` is `signature|privileged`; `pm grant` refuses
+  signature permissions.
+- No root: locked bootloader, verified boot green, no `su`.
+- Device owner is ruled out — `dpm set-device-owner` needs a device with **no
+  accounts**, and this one has three Google accounts.
+- `ACTION_REBOOT` resolves to the framework's `ShutdownActivity`, and from a
+  normal app it is **accepted and then silently does nothing** — measured: no
+  restart, no exception, not even a log line. That silence is why it is unused.
+- `PowerManager.reboot()` at least fails honestly: `SecurityException`. Measured
+  end to end — the launcher's pid changed 3808 → 4030 while `/proc/uptime` kept
+  climbing, which proves the refusal and the fallback both ran.
+
+So the button **restarts Home**, and the dialog says exactly that. A full system
+restart is still the remote: long-press power for the power menu.
+
+One bug this surfaced: after a dialog dismisses, the activity's saved focus beats
+`requestFocus()`, so focus landed on a tile and the next Enter launched an app.
+Focus is now restored from `setOnDismissListener` on a short post.

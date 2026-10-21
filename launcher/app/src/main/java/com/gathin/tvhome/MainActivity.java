@@ -104,9 +104,6 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
      */
     private static final long TIME_VALID_AFTER_MS = 1_735_689_600_000L;
     private String liveTvPkg;
-    /** Idle time on Home before ClockActivity; 0 is off (config.xml, home_idle_clock_minutes). */
-    private long idleClockMs;
-    private final Runnable showIdleClock = () -> startActivity(new Intent(this, ClockActivity.class));
     private String liveTvAction;
     private String inputAction;
     private String sourcePanelService;
@@ -205,6 +202,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     /** Tile order when reorder mode started, to save only when something moved. */
     private List<String> orderAtStart;
     private View btnReorder;
+    private View btnRestart;
     /** dock_apps as loaded (config.xml or a theme): a saved Order only applies while these are unchanged. */
     private List<String> dockApps;
     /** fill_dock false: the dock can have empty slots, which reorder mode leaves out and restores afterwards. */
@@ -299,7 +297,6 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         reducedMotion = cfg.reducedMotion;
         dockRow = cfg.dockRow;
         liveTvPkg = cfg.liveTvPackage;
-        idleClockMs = cfg.homeIdleClockMinutes * MINUTE_MS;
         liveTvAction = cfg.liveTvAction;
         inputAction = cfg.inputAction;
         sourcePanelService = cfg.sourcePanelService;
@@ -487,6 +484,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             return true;
         });
         btnSettings.setOnClickListener(v -> open(systemIntent(Settings.ACTION_SETTINGS)));
+        btnRestart = findViewById(R.id.btnRestart);
+        btnRestart.setOnClickListener(v -> promptRestart());
         btnReorder = findViewById(R.id.btnReorder);
         btnReorder.setOnClickListener(v -> toggleReorder());
         btnReorder.setVisibility(cfg.reorderButton ? View.VISIBLE : View.GONE);
@@ -521,18 +520,19 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
                 return true;
             }
             int firstButton = btnInputs.getVisibility() == View.VISIBLE ? R.id.btnInputs : firstTopButton().getId();
-            int leftButton = rtlMenuBar ? R.id.btnSettings : firstButton;
-            int rightButton = rtlMenuBar ? firstButton : R.id.btnSettings;
+            int leftButton = rtlMenuBar ? R.id.btnRestart : firstButton;
+            int rightButton = rtlMenuBar ? firstButton : R.id.btnRestart;
             if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) return v.getId() == leftButton;
             return keyCode == KeyEvent.KEYCODE_DPAD_RIGHT && v.getId() == rightButton;
         };
         btnInputs.setOnKeyListener(pillKeys);
         btnWifi.setOnKeyListener(pillKeys);
         btnSettings.setOnKeyListener(pillKeys);
+        btnRestart.setOnKeyListener(pillKeys);
         btnReorder.setOnKeyListener(pillKeys);
         btnLibraryTop.setOnKeyListener(pillKeys);
         if (advancedEffects) {
-            for (View button : new View[]{btnInputs, btnWifi, btnReorder, btnLibraryTop, btnSettings}) {
+            for (View button : new View[]{btnInputs, btnWifi, btnReorder, btnLibraryTop, btnSettings, btnRestart}) {
                 button.setOnFocusChangeListener((view, focused) -> view.animate()
                         .scaleX(focused ? 1.04f : 1f).scaleY(focused ? 1.04f : 1f)
                         .setDuration(160).start());
@@ -612,7 +612,6 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     @Override
     protected void onResume() {
         super.onResume();
-        restartIdleClock();
         promptsPaused = false;
         if (grid.getAdapter() == null) grid.setAdapter(adapter);   // dropped by onTrimMemory
         if (rebuildOnResume) {
@@ -724,22 +723,11 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         });
     }
 
-    /** Any key on Home restarts the countdown to the idle clock. */
-    @Override
-    public void onUserInteraction() {
-        super.onUserInteraction();
-        restartIdleClock();
-    }
 
-    private void restartIdleClock() {
-        root.removeCallbacks(showIdleClock);
-        if (idleClockMs > 0) root.postDelayed(showIdleClock, idleClockMs);
-    }
 
     @Override
     protected void onPause() {
         super.onPause();
-        root.removeCallbacks(showIdleClock);
         endReorder();   // Home or another app while reordering keeps the order so far
         wallpaperPlayer.stop();
         stopAmbientAnimation();
@@ -2292,6 +2280,76 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     // ---- launcher settings and module cards -------------------------------------------------------
 
     /** Keep a normal Settings click for the TV; the launcher's choices live behind hold OK. */
+    /** The restart button: confirm first, since a restart is disruptive and cannot be undone. */
+    private void promptRestart() {
+        final Dialog dialog = new Dialog(this);
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        View panel = getLayoutInflater().inflate(R.layout.dialog_confirm, null);
+        ((TextView) panel.findViewById(R.id.title)).setText(R.string.restart);
+        ((TextView) panel.findViewById(R.id.body)).setText(R.string.restart_confirm);
+        dialog.setContentView(panel);
+        dialog.setCanceledOnTouchOutside(false);
+        Window w = dialog.getWindow();
+        if (w != null) {
+            w.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+            w.setLayout((int) (440 * density), ViewGroup.LayoutParams.WRAP_CONTENT);
+            w.setDimAmount(0.6f);
+        }
+
+        TextView no = panel.findViewById(R.id.btnNo);
+        TextView yes = panel.findViewById(R.id.btnYes);
+        View.OnClickListener choose = v -> {
+            boolean restart = v.getId() == R.id.btnYes;
+            dialog.dismiss();
+            if (restart) restartTv();
+        };
+        no.setOnClickListener(choose);
+        yes.setOnClickListener(choose);
+        // Focus has to come back to the button that opened this. The activity's own saved focus wins
+        // otherwise and lands on a tile, where the next Enter would launch an app instead.
+        dialog.setOnDismissListener(d -> btnRestart.postDelayed(btnRestart::requestFocus, 60));
+        // Left and Right move between the two answers; Up and Down stay put.
+        View.OnKeyListener keys = (v, keyCode, event) -> {
+            if (event.getAction() != KeyEvent.ACTION_DOWN) return false;
+            if (keyCode == KeyEvent.KEYCODE_DPAD_UP || keyCode == KeyEvent.KEYCODE_DPAD_DOWN) return true;
+            if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) return v.getId() == R.id.btnNo;
+            return keyCode == KeyEvent.KEYCODE_DPAD_RIGHT && v.getId() == R.id.btnYes;
+        };
+        no.setOnKeyListener(keys);
+        yes.setOnKeyListener(keys);
+        dialog.show();
+        no.requestFocus();
+    }
+
+    /**
+     * Restarts the set.
+     *
+     * android.permission.REBOOT is signature|privileged, so an app installed from an APK can never hold
+     * it: there is no root here, pm grant refuses signature permissions, and the Google accounts on this
+     * device rule out making the app device owner (dpm needs a device with no accounts at all).
+     *
+     * Two ways to ask, and they fail differently. ACTION_REBOOT resolves to the framework's
+     * ShutdownActivity, and from a normal app it is accepted and then silently does nothing — the worst
+     * outcome, because the button looks dead. PowerManager.reboot() at least fails honestly with a
+     * SecurityException, so ask that way instead.
+     *
+     * When it is refused, restart Home rather than nothing: a wedged launcher is the usual reason to
+     * press this, and killing this process makes the system start it again. The delay lets logcat take
+     * the line above before the process dies.
+     */
+    private void restartTv() {
+        android.os.PowerManager pm = (android.os.PowerManager) getSystemService(POWER_SERVICE);
+        if (pm != null) {
+            try {
+                pm.reboot(null);
+                return;   // granted (a privileged build): the system reboots from here
+            } catch (SecurityException e) {
+                android.util.Log.w("tvhome", "TV reboot refused (REBOOT is signature-only); restarting Home", e);
+            }
+        }
+        btnRestart.postDelayed(() -> android.os.Process.killProcess(android.os.Process.myPid()), 250);
+    }
+
     private void showSettingsMenu() {
         View anchor = findViewById(R.id.btnSettings);
         View panel = getLayoutInflater().inflate(R.layout.popup_inputs, root, false);

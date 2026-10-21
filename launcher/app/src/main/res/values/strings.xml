@@ -107,4 +107,12 @@
     <!-- Cinematic top shelf (cinematic_home): the line under the focused dock app's name; %1$s is when it was
          last opened, e.g. "5 minutes ago" or "yesterday, 9:40 pm". -->
     <string name="last_opened">Last opened %1$s</string>
+    <string name="restart">Restart Home</string>
+
+    <string name="restart_confirm">Reload the home screen? The TV stays on and Home comes back in a few seconds.</string>
+
+    <string name="yes">Yes</string>
+
+    <string name="no">No</string>
+
 </resources>

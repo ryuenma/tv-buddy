@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Mirrored twin of scrim_reading.xml for the RTL layout, where the header sits on the right. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <gradient
+        android:type="radial"
+        android:centerX="0.90"
+        android:centerY="0.08"
+        android:gradientRadius="72%p"
+        android:startColor="#C0000000"
+        android:centerColor="#5A000000"
+        android:endColor="#00000000" />
+</shape>
