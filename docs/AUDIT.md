@@ -266,3 +266,77 @@ Two things this taught:
    sweep compares the TV's collection against `theme/wallpapers/`, and the mirrored
    pictures exist only on the TV, so all 16 counted as stale and were removed. It now
    skips the `ambient-` prefix, which `sync-ambient.sh` owns and prunes itself.
+
+## Audit, second pass (2026-10-21)
+
+Scope: the five commits after the first audit (`ea9822c`..`f81639a`) — clock
+screensaver removal, ambient artwork, the reading scrim, the restart button, sharp
+decode, and the script fix. Method: read the diff, run the unit suite, and run
+`lintRelease` over the whole module, which the first pass never did. Load assumed:
+one household, one 2 GB set, a single foreground launcher.
+
+### Blocker, fixed — lint failed the release build
+
+```
+[Error] MissingPermission  MainActivity.java:2344
+        Missing permissions required by PowerManager.reboot: android.permission.REBOOT
+```
+
+That call was mine. It existed to produce the evidence that the permission is
+unreachable, and it threw `SecurityException` on every press — so shipping it meant
+shipping a guaranteed exception dressed up as a feature, behind a permission this app
+can never hold. Removed: `restartHome()` now only restarts Home, which is all that was
+ever reachable and all the button and its dialog claim. Lint went 2 errors → 0.
+
+### Fix, fixed — the focus restore did not work
+
+The restart dialog restored focus from `setOnDismissListener` with a 60 ms
+`postDelayed(requestFocus)`. The framework's saved focus won that race, so pressing
+**No** left focus on a grid tile and the next Enter launched that app — measured, it
+opened YouTube. Focus is now claimed in `onWindowFocusChanged`, which is the only point
+that runs after the framework has finished restoring. Verified on the set: after No the
+restart button carries the focus highlight, and Enter reopens the dialog.
+
+Worth stating plainly: the first audit's version of this fix was reported as verified
+when only the *restart* path had been exercised. The cancel path never was.
+
+### Fix, fixed — the synced artwork had no test
+
+Every wallpaper is WEBP and `sync-ambient.sh` writes `ambient-<sha256>.webp`, but
+nothing covered that. Tightening the accepted-extension list would have emptied the
+collection and left the launcher drawing its plain background, with the whole suite
+still green. Added, including that a half-written `.webp.part` is ignored.
+
+### Fix, fixed — four files were committed with the wrong line endings
+
+Both layouts were stored as CRLF while every other source file is LF, so `git diff`
+showed all 298 and 304 lines removed and re-added; ignoring whitespace the real change
+was 25 added lines. `.gitattributes` now pins LF (CRLF for `.bat`/`.cmd`, binaries
+untouched) and both layouts are normalised. This cost real time during the audit
+before it was spotted — a diff that large invites skipping the review.
+
+### Watch — coverage is thin exactly where the new code is
+
+`restartHome()`, `rescanCollection()` and the `wallpaper_soften` plumbing have no
+tests. The first two are Context- and UI-bound, and `Config` parsing has never had a
+test file at all. The rotation semantics they lean on (`due`/`pick`/`next`) are
+covered, which is the part that decides behaviour.
+
+### Watch — the shell scripts are only tested by hand
+
+`sync-ambient.sh`, `push-theme.sh` and `pull-ambient-art.sh` are exercised against the
+TV or not at all. The prune loop in `push-theme.sh` already destroyed the synced set
+once. They are small and the failure is visible as missing artwork, so this stays a
+watch rather than a fix.
+
+### Load and memory
+
+`rescanCollection()` lists a 26-entry directory, and only when a rotation is actually
+due — no hot-path concern. PSS measured 41 MB (blurred, RGB_565) to 62 MB (sharp,
+ARGB_8888) against 454–479 MB free. One transient 95 MB sample was caught mid-decode
+and is not the steady state.
+
+### Not read this pass
+
+`AppLibraryDialog` and the three settings activities, unchanged since the first audit
+and still the least-examined code in the repo.
