@@ -131,7 +131,11 @@
     <bool name="always_show_names">false</bool>
     <!-- Wallpapers decode as RGB_565 (2 bytes a pixel, 4 MB at 1080p), which bands dark gradients such as a night
          sky, most of all under wallpaper_dim. true decodes them in 32-bit colour: 8 MB, for TVs with 2 GB or more. -->
-    <bool name="wallpaper_true_color">false</bool>
+    <bool name="wallpaper_true_color">true</bool>
+    <!-- Pre-blur each wallpaper once at decode time (shrink to a quarter, box-blur, scale back up).
+         Off: these pictures are 1920x1080 on a 1920x1080 display, so that round trip is detail lost
+         for a softer look. Turn on only if a sharp photograph behind the glass is too busy. -->
+    <bool name="wallpaper_soften">false</bool>
 
     <!-- Grid rows left visible under the dock on the home screen. 0 = dock sits at the very bottom. Tiles shrink if
          the dock, its title and this many rows would not otherwise fit the screen height. -->

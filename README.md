@@ -183,17 +183,21 @@ copy runs on the TV (`sh -s`), so no picture crosses the network. Schedule it if
 you want it to keep up on its own — the launcher rescans its own collection on every
 rotation, so nothing needs restarting when it lands.
 
-Two things adapt the artwork to the interface. The picture is **blurred once at
-decode** (shrink to a quarter, box-blur, scale back up) rather than per frame,
-which Android 11 makes necessary — it has no `RenderEffect` (API 31) and no AGSL
-(API 33). And because these are photographs, a soft vignette anchored on the
-header's corner (`scrim_reading`) keeps the greeting, clock and date legible over
-a bright sky. Nothing blurs or dims the photo beyond that.
+**The artwork is shown as it is.** No blur, and no colour reduction: the pictures
+decode at full resolution in 32-bit colour (`wallpaper_true_color`), and a
+1080p picture on a 1080p display is drawn 1:1. An earlier build shrank each
+picture to a quarter and blurred it back up to fake a soft backdrop — at 1:1 that
+is nothing but lost detail, and on the set it read as "a blurry mess", so it is
+off.
 
-Consequence worth knowing: **the photo is softened deliberately, but only
-lightly.** Earlier the shrink was 1/8, which turned a photograph into a colour
-field; at 1/4 the subject still reads, which is the point of using real artwork.
-Readability is the dim layer's and the vignette's job, not the blur's.
+The blur is still there behind `wallpaper_soften` for anyone who wants the softer
+look; it costs ~21 MB of PSS to turn off (a full-resolution ARGB_8888 bitmap
+instead of a half-megabyte thumbnail), against ~62 MB total here and 467 MB free.
+
+Readability is handled by the dim layer plus the vignette anchored on the header's
+corner (`scrim_reading`), not by softening the picture — so the greeting, clock and
+date stay legible over a busy painting without the background going mushy.
+`theme/config.json` tunes the dim live, with no rebuild.
 
 ## Docs
 

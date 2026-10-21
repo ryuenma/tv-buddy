@@ -233,3 +233,36 @@ One environment note that cost time here: **logcat is empty on this set** (`logc
 -d` returns 0 lines), so `Log.w` is useless for diagnosis. The uid/permission
 question above was answered by having the app write a status file into its own
 directory and reading that back.
+
+## Sharp artwork (2026-10-21)
+
+Seen live, the background was "a blurry mess" — correct, and it was our doing. The
+decode-time blur shrank each 1080p picture to 480×270 and scaled it back up, which
+on a 1080p display is nothing but lost detail. It is now **off by default**, and the
+pictures decode in 32-bit colour instead of RGB_565.
+
+Measured A/B: same wallpaper, only `wallpaper_soften` in `config.json` toggled.
+
+| | blur on | blur off |
+|---|---|---|
+| edge energy, background crop | 0.53 | **5.57** (10.5×) |
+| screenshot PNG | 1.27 MB | **3.10 MB** |
+| region brightness | 57.2 | 57.7 |
+| on/off correlation | 0.998 — the same scene, so only detail differs | |
+
+Cost: PSS settles at ~62 MB instead of ~41 MB, because the displayed bitmap is now a
+full-resolution ARGB_8888 frame rather than a half-megabyte thumbnail. Against
+454–467 MB available that is affordable. `wallpaper_soften` keeps the old look one
+config push away.
+
+Two things this taught:
+
+1. **Judge sharpness on a 1:1 crop, never the full frame.** The full screenshot —
+   and any viewer that downscales it — reads as soft even when the pixels are
+   crisp; at native resolution the fur texture is plainly there. Google's ambient
+   art also includes shallow-depth-of-field photographs that look soft *by design*,
+   which is easy to mistake for our blur still being on.
+2. **`push-theme.sh` deleted the entire synced ambient set once.** Its stale-image
+   sweep compares the TV's collection against `theme/wallpapers/`, and the mirrored
+   pictures exist only on the TV, so all 16 counted as stale and were removed. It now
+   skips the `ambient-` prefix, which `sync-ambient.sh` owns and prunes itself.

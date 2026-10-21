@@ -32,6 +32,8 @@ final class WallpaperPlayer {
     private final int width;
     /** config wallpaper_true_color: ARGB_8888 instead of RGB_565. */
     private final Bitmap.Config bitmapConfig;
+    /** config wallpaper_soften: pre-blur at decode time. Off by default, see Config. */
+    private final boolean soften;
     private final int height;
     private boolean active;
     private boolean closed;
@@ -44,6 +46,7 @@ final class WallpaperPlayer {
         files = new ArrayList<>(config.wallpapers);
         interval = config.wallpaperRotationMinutes * 60_000L;
         bitmapConfig = config.wallpaperTrueColor ? Bitmap.Config.ARGB_8888 : Bitmap.Config.RGB_565;
+        soften = config.wallpaperSoften;
         order = config.wallpaperOrder;
         preferences = context.getSharedPreferences("wallpaper_rotation", Context.MODE_PRIVATE);
         // Playback state belongs to one collection. Changing the collection starts from its first
@@ -192,7 +195,8 @@ final class WallpaperPlayer {
                 options.inTargetDensity = scale[1];
             }
             options.inPreferredConfig = bitmapConfig;
-            return soften(BitmapFactory.decodeFile(file.getPath(), options));
+            Bitmap decoded = BitmapFactory.decodeFile(file.getPath(), options);
+            return soften ? soften(decoded) : decoded;
         } catch (Exception | OutOfMemoryError failure) {
             return null;
         }
