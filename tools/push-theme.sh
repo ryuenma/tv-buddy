@@ -31,9 +31,12 @@ for f in theme/wallpapers/*.jpg theme/wallpapers/*.jpeg theme/wallpapers/*.png t
 done
 
 # Drop any image the collection no longer has, so a removed wallpaper stops rotating in.
+# Copies under the ambient- prefix are not ours to judge: sync-ambient.sh mirrors them from the
+# screensaver and tracks its own deletions, so pruning them here would wipe the whole synced set.
 LOCAL=$(for f in theme/wallpapers/*.jpg theme/wallpapers/*.jpeg theme/wallpapers/*.png theme/wallpapers/*.webp; do [ -f "$f" ] && basename "$f"; done | sort)
 REMOTE=$("$ADB" -s "$TV" shell "ls $DIR/wallpapers" 2>/dev/null | tr -d '\r' | sort)
 for name in $REMOTE; do
+  case "$name" in ambient-*) continue ;; esac
   printf '%s\n' "$LOCAL" | grep -qx "$name" || { "$ADB" -s "$TV" shell "rm -f $DIR/wallpapers/$name"; echo "removed stale $name"; }
 done
 
