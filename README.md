@@ -26,15 +26,17 @@ Nothing is uninstalled and every change is reversible.
 
 | Area | State |
 |---|---|
-| Release build | ✅ 438,839 B, R8 + `shrinkResources` |
-| Install as a normal app | ✅ HOME left on Google TV |
+| Release build | ✅ 418,635 B, R8 + `shrinkResources` |
+| Install as a normal app | ✅ verified |
 | Renders on device | ✅ clock, greeting, docks, quick pills |
 | D-pad navigation | ✅ verified |
 | Inputs menu | ✅ HDMI 1–3 · AV · **Live TV** |
 | HDMI 4 | ❌ not offered — see *Known limits* |
-| Used as HOME | ⏳ not yet switched |
-| Liquid Glass styling | ⏳ planned, pre-blurred wallpaper |
-| Debloat inventory | ⏳ deferred, safe/caution/danger |
+| **Used as HOME** | ✅ **stock launcher disabled, survives reboot** |
+| **Wallpaper + blur** | ✅ rotating abstract set, blurred once at decode |
+| Festival/cultural extras | ✅ removed (1,820 lines deleted) |
+| Debloat | ✅ 26 packages disabled, swap down 89% |
+| Remote/HDMI/audio verification | ⏳ needs a human with the remote |
 
 ## Upstream and our changes
 

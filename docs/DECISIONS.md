@@ -251,6 +251,60 @@ The `dreamx` screensaver takes the screen when idle, so every launch sequence mu
 send `KEYCODE_WAKEUP` first or the `am start` is covered by the dream.
 
 
+## CUTOVER — DONE (2026-10-21)
+
+The TV now boots into `com.gathin.tvhome`. Verified across a reboot **and** a
+reinstall.
+
+### What did NOT work, and why
+
+1. **`cmd package set-home-activity com.gathin.tvhome/.MainActivity`** →
+   prints `Success`, and changes nothing. HOME still resolved to
+   `com.google.android.apps.tv.launcherx` immediately afterwards.
+2. **`android:priority="3"` on the HOME intent-filter** → does not work either.
+   Verified properly rather than assumed: the pulled-back installed APK contained
+   `priority(0x0101001c)=3`, yet `cmd package query-activities` still reported
+   `priority=0` for our activity after a reboot. **This build ignores
+   `android:priority` for HOME resolution.** The change was reverted.
+
+### What worked
+
+```bash
+pm disable-user --user 0 com.google.android.apps.tv.launcherx
+```
+
+With the stock launcher parked, our `priority=0` beats `FallbackHome`'s
+`-1000` and becomes the only live HOME. This is why cleanyourtv's own install
+script offers to turn the stock home screen off — the framework will not hand
+HOME over otherwise.
+
+### Rollback
+
+`launcherx` is **disabled, never uninstalled** (`installed=true enabled=3`), so:
+
+```bash
+pm enable com.google.android.apps.tv.launcherx
+# Google TV comes back without its notification access unless it is re-granted:
+cmd notification allow_listener \
+  com.google.android.apps.tv.launcherx/.coreservices.notificationlistener.TvNotificationListenerService
+```
+
+That second line is not optional — it is the workaround `tv-detox`'s `undo.sh`
+documents as its issue #16.
+
+### Measured result
+
+| Metric | Before project | After Tier 1 | **After cutover** |
+|---|---|---|---|
+| Swap in use | 504 MB | 228 MB | **56 MB** |
+| `MemAvailable` | 315 MB | 499 MB | **505 MB** |
+| `launcherx` processes | 2 (`322 MB` RES) | 2 | **0** |
+| Our launcher PSS | — | 44 MB | **29 MB** |
+| Disabled packages | 5 | 25 | **26** |
+
+Swap in use is down **89%** from where this started, and the stock launcher is
+gone from `ps` entirely.
+
 ## Next step
 
 1. Verify interactions on the real TV: D-pad focus movement, **Inputs** menu
