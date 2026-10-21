@@ -41,6 +41,22 @@ public class WallpaperRotationTest {
         assertTrue(WallpaperRotation.images(new File(dir, "missing")).isEmpty());
     }
 
+    /**
+     * tools/sync-ambient.sh mirrors the screensaver's artwork in as ambient-<sha256>.webp, and every
+     * wallpaper in the collection is WEBP. If that suffix stopped being accepted, the collection would
+     * come back empty and the launcher would draw its plain background with no picture at all.
+     */
+    @Test
+    public void imagesKeepsTheWebpFilesTheAmbientSyncWrites() throws IOException {
+        File dir = Files.createTempDirectory("ambient").toFile();
+        String hash = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+        touch(dir, "ambient-" + hash + ".webp", 10);
+        touch(dir, "background1_1080p.webp", 10);
+        touch(dir, "ambient-" + hash + ".webp.part", 10);   // half-written copy must not rotate in
+        assertEquals(Arrays.asList("ambient-" + hash + ".webp", "background1_1080p.webp"),
+                names(WallpaperRotation.images(dir)));
+    }
+
     @Test
     public void pickAvoidsThePreviousPictureWhenThereIsAnother() {
         List<File> images = Arrays.asList(new File("a.jpg"), new File("b.jpg"));
