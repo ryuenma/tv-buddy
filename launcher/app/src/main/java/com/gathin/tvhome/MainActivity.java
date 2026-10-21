@@ -149,14 +149,9 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private int wifiIcon;
     /** The pills have been filled in once; later resumes refresh them after the first frame. */
     private boolean pillsShown;
-    private TextView shamsiDate;
     private TextView stats;
-    private List<RaceWeekend.Race> raceCalendar;
-    private View racePanel;
-    private TextView raceKicker, raceHeadline, raceSessions;
     /** config.xml show_stats, overridable by a theme. Off: the line is gone and nothing is read. */
     private boolean showStats;
-    private boolean shamsi;
     /** greeting_name: said after the greeting, which is shown in capitals. */
     private String greetingName = "";
     /** Optional time-of-day backdrop (config.xml, sky_intensity); 0 keeps it hidden. */
@@ -186,15 +181,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private boolean reducedMotion;
     /** config.xml dock_row: the first row is a separate dock (band, parked low, top shelf) rather than plain grid. */
     private boolean dockRow;
-    /** Festive skin from the theme (see Festival); applied while it is active today. */
-    private Festival festival = Festival.NONE;
-    private boolean festive;
-    private DiyaDrawable diya;
-    private BellDrawable bell;
-    private MarigoldDrawable marigold;
     private int greetingColor;
-    /** The day the petal shower last played, so it greets the first Home of each day only. */
-    private static LocalDate lastPetalShower;
     /** hidden_apps as the adapter sees them (config.xml or a theme's config.json): a hidden app gets no card either. */
     private Set<String> hiddenApps = Collections.emptySet();
     private List<Cards.Card> cards = Collections.emptyList();
@@ -290,7 +277,6 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         @Override
         public void run() {
             updateGreeting();
-            updateRace();
             updateWifiLabel();
             sky.update();
             wallpaperPlayer.update();
@@ -312,8 +298,6 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         advancedEffects = cfg.animations && cfg.advancedEffects;
         reducedMotion = cfg.reducedMotion;
         dockRow = cfg.dockRow;
-        festival = cfg.festival;
-        festive = festival.active(LocalDate.now());
         liveTvPkg = cfg.liveTvPackage;
         idleClockMs = cfg.homeIdleClockMinutes * MINUTE_MS;
         liveTvAction = cfg.liveTvAction;
@@ -331,7 +315,6 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         sky = findViewById(R.id.sky);
         sky.setIntensity(cfg.skyIntensity);
         glass = findViewById(R.id.glass);
-        if (festive) glass.setAccent(festival.accentColor());
         ambient = findViewById(R.id.ambient);
         // The glow is one bitmap, so its alpha can be applied while drawing it. Otherwise every frame of
         // a fade renders it into a full-screen offscreen buffer first.
@@ -355,22 +338,9 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         clockBlock = findViewById(R.id.leftBlock);
         greetingColor = greeting.getCurrentTextColor();
         btnWifi = findViewById(R.id.btnWifi);
-        shamsiDate = findViewById(R.id.shamsiDate);
         stats = findViewById(R.id.stats);
-        raceCalendar = cfg.raceCalendar;
-        racePanel = findViewById(R.id.racePanel);
-        raceKicker = findViewById(R.id.raceKicker);
-        raceHeadline = findViewById(R.id.raceHeadline);
-        raceSessions = findViewById(R.id.raceSessions);
         showStats = cfg.showStats;
-        shamsi = cfg.shamsiDate;
         greetingName = cfg.greetingName;
-        if (shamsi) {
-            shamsiDate.setVisibility(View.VISIBLE);
-            TextView date = findViewById(R.id.date);
-            date.setTextSize(11f);
-            date.setPadding(0, (int) (4 * density), 0, 0);
-        }
         vpnApp = cfg.vpnApp;
         moduleCards = cfg.moduleCards;
         hiddenApps = new HashSet<>(cfg.hiddenApps);
@@ -568,7 +538,6 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
                         .setDuration(160).start());
             }
         }
-        if (festive) applyFestiveSkin((TextView) btnInputs, (TextView) btnSettings);
 
         // Hide the glass when focus leaves the tiles.
         getWindow().getDecorView().getViewTreeObserver().addOnGlobalFocusChangeListener((oldF, newF) -> {
@@ -643,11 +612,6 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     @Override
     protected void onResume() {
         super.onResume();
-        // A festival that started or ended while Home was in the background: rebuild with or without it.
-        if (festive != festival.active(LocalDate.now())) {
-            recreate();
-            return;
-        }
         restartIdleClock();
         promptsPaused = false;
         if (grid.getAdapter() == null) grid.setAdapter(adapter);   // dropped by onTrimMemory
@@ -657,7 +621,6 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         }
         rebuildOnResume = false;
         updateGreeting();
-        updateRace();
         // The network and Inputs pills keep their state while Home is in the background, and callbacks update them
         // when the network or the inputs change, so this refresh only catches anything missed. Its binder calls
         // (about 7 ms on a TCL C755, most of it WifiManager.getConnectionInfo) would hold up the first frame back
@@ -673,14 +636,6 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         sky.update();
         wallpaperPlayer.start();
         handler.postDelayed(minuteTick, MINUTE_MS);
-        if (festive && diya != null) {
-            diya.start();
-            LocalDate today = LocalDate.now();
-            if (!reducedMotion && !today.equals(lastPetalShower)) {
-                lastPetalShower = today;
-                handler.postDelayed(this::playPetalShower, 450);
-            }
-        }
     }
 
     @Override
@@ -793,7 +748,6 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         heroArt.animate().cancel();
         handler.removeCallbacks(minuteTick);
         stopStats();
-        if (diya != null) diya.stop();
         cancelPendingFocusScroll();
         // Nothing of ours stays on screen over another app; an undecided prompt simply returns next time.
         if (cardPrompt != null) cardPrompt.dismiss();
@@ -1061,7 +1015,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         drop();
         reordering = false;
         adapter.setReordering(false);
-        glass.setAccent(festive ? festival.accentColor() : 0);
+        glass.setAccent(0);
         btnReorder.setActivated(false);
         List<String> keys = adapter.movableKeys();
         List<String> before = orderAtStart;
@@ -1202,8 +1156,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         glassTargetX = x;
         glassTargetY = y;
         // Cinematic shelf: the highlight glows in the dock app's colour, plain white in the grid.
-        int accent = cinematic && !festive && position < COLUMNS ? adapter.ambientColorAt(position) : 0;
-        if (cinematic && !festive && accent != glassAccent) {
+        int accent = cinematic && position < COLUMNS ? adapter.ambientColorAt(position) : 0;
+        if (cinematic && accent != glassAccent) {
             glassAccent = accent;
             glass.setAccent(accent);
         }
@@ -1920,72 +1874,11 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         else if (hour < 17) res = R.string.good_afternoon;
         else if (hour < 22) res = R.string.good_evening;
         else res = R.string.good_night;
-        String festiveGreeting = festive ? festival.greetingText() : "";
-        if (!festiveGreeting.isEmpty()) {
-            greeting.setText(festiveGreeting);
-            greeting.setTextColor(liftTowardsWhite(festival.accentColor(), 0.25f));
-        } else {
-            greeting.setText(greetingName.isEmpty() ? getString(res)
-                    : getString(R.string.greeting_with_name, getString(res), greetingName));
-            greeting.setTextColor(greetingColor);
-        }
-        if (shamsi) shamsiDate.setText(Shamsi.today());
+        greeting.setText(greetingName.isEmpty() ? getString(res)
+                : getString(R.string.greeting_with_name, getString(res), greetingName));
+        greeting.setTextColor(greetingColor);
     }
 
-    // ---- race-weekend panel (a theme's race_calendar) -----------------------------------------------
-
-    private static final int RACE_RED = 0xFFFF3B2F;
-
-    /**
-     * Shows or hides the race-weekend panel for this minute. Text only, set once a minute with the clock:
-     * nothing animates, so the panel costs the GPU nothing between ticks.
-     */
-    private void updateRace() {
-        if (raceCalendar.isEmpty()) return;
-        RaceWeekend.State s = RaceWeekend.at(raceCalendar, java.time.Instant.now());
-        if (s == null) {
-            racePanel.setVisibility(View.GONE);
-            return;
-        }
-        RaceWeekend.Race race = s.race;
-        raceKicker.setText(race.place.isEmpty()
-                ? getString(R.string.race_kicker_no_place, race.round, race.shortName())
-                : getString(R.string.race_kicker, race.round, race.shortName(), race.place));
-
-        if (s.live != null) {
-            SpannableString live = new SpannableString("\u25CF  " + getString(R.string.race_live, s.live.title()));
-            live.setSpan(new android.text.style.ForegroundColorSpan(RACE_RED), 0, 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-            raceHeadline.setText(live);
-        } else if (s.next != null) {
-            String in = RaceWeekend.countdown(s.untilNext);
-            raceHeadline.setText(s.next.isRace() ? getString(R.string.race_lights_out, in)
-                    : getString(R.string.race_next, s.next.title(), in));
-        } else {
-            raceHeadline.setText(R.string.race_finished);
-        }
-
-        // FP1 FRI 11:00 PM   FP2 SAT 2:30 AM ...: done sessions fade, the live one is red, the next one bright.
-        java.time.format.DateTimeFormatter when = java.time.format.DateTimeFormatter.ofPattern(
-                android.text.format.DateFormat.is24HourFormat(this) ? "EEE HH:mm" : "EEE h:mm a", Locale.getDefault())
-                .withZone(java.time.ZoneId.systemDefault());
-        android.text.SpannableStringBuilder row = new android.text.SpannableStringBuilder();
-        for (int i = 0; i < race.sessions.size(); i++) {
-            RaceWeekend.Session session = race.sessions.get(i);
-            if (i > 0) row.append("     ");
-            int start = row.length();
-            row.append(session.shortName()).append("  ").append(when.format(session.start).toUpperCase(Locale.getDefault()));
-            int color;
-            switch (s.statuses.get(i)) {
-                case DONE: color = 0x47FFFFFF; break;
-                case LIVE: color = RACE_RED; break;
-                case NEXT: color = 0xFFFFFFFF; break;
-                default: color = 0x99FFFFFF;
-            }
-            row.setSpan(new android.text.style.ForegroundColorSpan(color), start, row.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-        }
-        raceSessions.setText(row);
-        racePanel.setVisibility(View.VISIBLE);
-    }
 
     private void refreshPillsAfterNextDraw() {
         root.getViewTreeObserver().addOnPreDrawListener(new ViewTreeObserver.OnPreDrawListener() {
@@ -2010,7 +1903,6 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         String text = getString(R.string.wifi);
         boolean vpn = false, online = false;
         int icon = R.drawable.ic_wifi;
-        // The diya's flame: 0 is out (offline), 1 to 4 follow the Wi-Fi signal, Ethernet burns steady at 4.
         int flame = 0;
         boolean steady = false;
         try {
@@ -2076,15 +1968,9 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             btnWifi.setContentDescription(btnWifi.getText());
             btnWifi.setText(null);
         }
-        if (festive && diya != null) {
-            if (online && flame == 0) flame = 3;   // online some other way (cellular, USB tethering)
-            diya.setSteady(steady);
-            diya.setFlame(flame);
-        } else {
-            if (icon != wifiIcon) {
-                wifiIcon = icon;
-                btnWifi.setCompoundDrawablesRelativeWithIntrinsicBounds(icon, 0, 0, 0);
-            }
+        if (icon != wifiIcon) {
+            wifiIcon = icon;
+            btnWifi.setCompoundDrawablesRelativeWithIntrinsicBounds(icon, 0, 0, 0);
         }
     }
 
@@ -2108,56 +1994,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         pill.getLayoutParams().width = Math.round(42 * density);
     }
 
-    // ---- festive skin ------------------------------------------------------------------------------
 
-    /**
-     * Swaps the pill icons for the festival's: a bell for Inputs that swings when focused, a diya for the
-     * network whose flame follows the connection, and a marigold for Settings that turns when focused.
-     */
-    private void applyFestiveSkin(TextView inputs, TextView settings) {
-        bell = new BellDrawable(density);
-        marigold = new MarigoldDrawable(density);
-        diya = new DiyaDrawable(density);
-        bell.setReducedMotion(reducedMotion);
-        marigold.setReducedMotion(reducedMotion);
-        diya.setReducedMotion(reducedMotion);
-        setFestiveIcon(inputs, bell);
-        setFestiveIcon(btnWifi, diya);
-        setFestiveIcon(settings, marigold);
-        addFocusAction(inputs, bell::ring);
-        addFocusAction(settings, marigold::turn);
-    }
-
-    private static void setFestiveIcon(TextView pill, Drawable icon) {
-        // The pills tint their icons to follow focus; the festive ones keep their own colours.
-        pill.setCompoundDrawableTintList(null);
-        pill.setCompoundDrawablesRelativeWithIntrinsicBounds(icon, null, null, null);
-    }
-
-    /** Runs {@code action} when the view gains focus, keeping any focus listener it already had. */
-    private static void addFocusAction(View view, Runnable action) {
-        View.OnFocusChangeListener previous = view.getOnFocusChangeListener();
-        view.setOnFocusChangeListener((v, focused) -> {
-            if (previous != null) previous.onFocusChange(v, focused);
-            if (focused) action.run();
-        });
-    }
-
-    private void playPetalShower() {
-        if (isFinishing() || isDestroyed()) return;
-        PetalShowerView shower = new PetalShowerView(this);
-        root.addView(shower, new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-        shower.play(60, 2200, () -> root.removeView(shower));
-    }
-
-    private static int liftTowardsWhite(int argb, float amount) {
-        int r = (argb >> 16) & 0xFF, g = (argb >> 8) & 0xFF, b = argb & 0xFF;
-        r += (int) ((255 - r) * amount);
-        g += (int) ((255 - g) * amount);
-        b += (int) ((255 - b) * amount);
-        return 0xFF000000 | (r << 16) | (g << 8) | b;
-    }
 
     /** The network pill opens the VPN app when one is configured and installed, otherwise Wi-Fi settings. */
     private void openNetworkPill() {
