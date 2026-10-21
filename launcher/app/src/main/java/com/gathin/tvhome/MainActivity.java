@@ -72,9 +72,7 @@ import androidx.dynamicanimation.animation.SpringForce;
 import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
-import java.io.File;
 import java.io.IOException;
-import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collections;
@@ -2301,7 +2299,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         View.OnClickListener choose = v -> {
             boolean restart = v.getId() == R.id.btnYes;
             dialog.dismiss();
-            if (restart) restartTv();
+            if (restart) restartHome();
         };
         no.setOnClickListener(choose);
         yes.setOnClickListener(choose);
@@ -2322,31 +2320,21 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     }
 
     /**
-     * Restarts the set.
+     * Restarts Home.
      *
-     * android.permission.REBOOT is signature|privileged, so an app installed from an APK can never hold
-     * it: there is no root here, pm grant refuses signature permissions, and the Google accounts on this
-     * device rule out making the app device owner (dpm needs a device with no accounts at all).
+     * A system restart is not reachable from an app installed from an APK, and that was measured rather
+     * than assumed: android.permission.REBOOT is signature|privileged, so `pm grant` refuses it; there is
+     * no root; and the three Google accounts on this set rule out device owner, which needs a device with
+     * no accounts at all. Both API routes were tried on the device — ACTION_REBOOT is accepted and then
+     * silently does nothing, and PowerManager.reboot() throws SecurityException every time.
      *
-     * Two ways to ask, and they fail differently. ACTION_REBOOT resolves to the framework's
-     * ShutdownActivity, and from a normal app it is accepted and then silently does nothing — the worst
-     * outcome, because the button looks dead. PowerManager.reboot() at least fails honestly with a
-     * SecurityException, so ask that way instead.
-     *
-     * When it is refused, restart Home rather than nothing: a wedged launcher is the usual reason to
-     * press this, and killing this process makes the system start it again. The delay lets logcat take
-     * the line above before the process dies.
+     * Calling PowerManager.reboot() anyway would be a guaranteed exception (lint flags it as a missing
+     * permission, correctly) dressed up as a feature, so this does not. Killing the process is what
+     * actually helps: the system starts Home again, and a wedged launcher is the usual reason to press
+     * this. A full restart is still long-press power on the remote.
      */
-    private void restartTv() {
-        android.os.PowerManager pm = (android.os.PowerManager) getSystemService(POWER_SERVICE);
-        if (pm != null) {
-            try {
-                pm.reboot(null);
-                return;   // granted (a privileged build): the system reboots from here
-            } catch (SecurityException e) {
-                android.util.Log.w("tvhome", "TV reboot refused (REBOOT is signature-only); restarting Home", e);
-            }
-        }
+    private void restartHome() {
+        // Posted rather than called inline so the dialog's dismissal and focus restore finish first.
         btnRestart.postDelayed(() -> android.os.Process.killProcess(android.os.Process.myPid()), 250);
     }
 
